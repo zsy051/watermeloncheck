@@ -68,9 +68,9 @@ function animateGraph() {
     const sampleRate = audioContext.sampleRate;
     const binCount = analyser.frequencyBinCount;
 
-    // 采样频率范围 100Hz ~ 250Hz
+    // 采样频率范围 100Hz ~ 450Hz
     const minFreq = 100;
-    const maxFreq = 250;
+    const maxFreq = 450;
 
     const frequencies = [];
     const amplitudes = [];
