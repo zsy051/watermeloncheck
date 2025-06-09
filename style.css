@@ -2,6 +2,7 @@ body {
     font-family: Arial, sans-serif;
     text-align: center;
     padding: 20px;
+    background-color: #f4f4f9;
 }
 h1 {
     color: #4CAF50;
@@ -22,4 +23,9 @@ button:hover {
     margin-top: 20px;
     font-size: 18px;
     color: #333;
+}
+canvas {
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    background-color: white;
 }
