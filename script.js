@@ -9,7 +9,6 @@ let detecting = false;
 let animationId;
 let startTime;
 let frequencyHistory = [];
-const minDecibels = -50; // 设置分贝过滤阈值
 
 // 动态适配 canvas 尺寸
 function resizeCanvas() {
@@ -35,7 +34,6 @@ async function startDetection() {
         source.connect(analyser);
 
         analyser.fftSize = 2048;
-        analyser.minDecibels = minDecibels; // 设置分贝阈值
         bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
 
@@ -74,21 +72,25 @@ function detectFrequency() {
     const nyquist = audioContext.sampleRate / 2;
     const frequency = (maxIndex / bufferLength) * nyquist;
 
-    // 检测分贝并过滤环境音
-    const signalEnergy = dataArray.reduce((sum, value) => sum + value ** 2, 0) / bufferLength;
-    const decibels = 10 * Math.log10(signalEnergy);
-    if (frequency >= 20 && frequency <= 250 && decibels > minDecibels) {
-        const timeElapsed = (Date.now() - startTime) / 1000; // 转换为秒
-        frequencyHistory.push({ time: timeElapsed, frequency });
+    if (frequency >= 20 && frequency <= 250) {
+        const timeElapsed = (Date.now() - startTime) / 1000; // 以秒计时
 
-        // 仅保留最近 3 秒内的数据
+        // 采样：仅保留每隔 10ms 的点
+        if (
+            frequencyHistory.length === 0 || 
+            timeElapsed - frequencyHistory[frequencyHistory.length - 1].time > 0.01
+        ) {
+            frequencyHistory.push({ time: timeElapsed, frequency });
+        }
+
+        // 保留最近 3 秒的数据
         frequencyHistory = frequencyHistory.filter((point) => point.time >= timeElapsed - 3);
 
         const ripeness = determineRipeness(frequency);
         resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz, 成熟度: ${ripeness}`;
     }
 
-    setTimeout(detectFrequency, 33); // 约 30 帧每秒
+    requestAnimationFrame(detectFrequency);
 }
 
 function animateGraph() {
@@ -112,7 +114,6 @@ function animateGraph() {
         { value: 133, label: "熟瓜" },
         { value: 20, label: "20 Hz" },
     ];
-
     yLabels.forEach((label) => {
         const y = canvas.height - 50 - (label.value / 250) * (canvas.height - 60);
         ctx.fillText(label.label, 5, y + 3);
