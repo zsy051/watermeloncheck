@@ -73,8 +73,11 @@ function detectFrequency() {
     const frequency = (maxIndex / bufferLength) * nyquist;
 
     if (frequency >= 20 && frequency <= 250) {
-        const timeElapsed = Date.now() - startTime;
+        const timeElapsed = (Date.now() - startTime) / 1000; // 转换为秒
         frequencyHistory.push({ time: timeElapsed, frequency });
+
+        // 仅保留最近 3 秒内的数据
+        frequencyHistory = frequencyHistory.filter((point) => point.time >= timeElapsed - 3);
 
         const ripeness = determineRipeness(frequency);
         resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz, 成熟度: ${ripeness}`;
@@ -88,6 +91,7 @@ function animateGraph() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // 绘制坐标轴
     ctx.strokeStyle = "#888";
     ctx.beginPath();
     ctx.moveTo(50, 10);
@@ -95,6 +99,7 @@ function animateGraph() {
     ctx.lineTo(canvas.width - 10, canvas.height - 50);
     ctx.stroke();
 
+    // 绘制频率刻度
     const yLabels = [
         { value: 250, label: "250 Hz" },
         { value: 189, label: "生瓜" },
@@ -112,10 +117,23 @@ function animateGraph() {
         ctx.stroke();
     });
 
+    // 绘制时间刻度
+    const xEndTime = frequencyHistory.length > 0 ? frequencyHistory[frequencyHistory.length - 1].time : 0;
+    for (let i = Math.floor(xEndTime - 3); i <= xEndTime; i++) {
+        const x = 50 + ((i - (xEndTime - 3)) / 3) * (canvas.width - 60);
+        ctx.fillText(`${i}s`, x, canvas.height - 30);
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height - 55);
+        ctx.lineTo(x, canvas.height - 45);
+        ctx.stroke();
+    }
+
+    // 绘制频率曲线
     ctx.strokeStyle = "#4CAF50";
+    ctx.lineWidth = 2;
     ctx.beginPath();
     frequencyHistory.forEach((point, index) => {
-        const x = 50 + (point.time / 10000) * (canvas.width - 60);
+        const x = 50 + ((point.time - (xEndTime - 3)) / 3) * (canvas.width - 60);
         const y = canvas.height - 50 - (point.frequency / 250) * (canvas.height - 60);
         if (index === 0) {
             ctx.moveTo(x, y);
