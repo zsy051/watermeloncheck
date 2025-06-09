@@ -1,88 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>西瓜成熟度检测</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-        }
-        h1 {
-            color: #4CAF50;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .result {
-            margin-top: 20px;
-            font-size: 18px;
-            color: #333;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <h1>西瓜成熟度检测</h1>
     <p>点击“开始检测”，然后轻敲西瓜，系统会分析声音频率。</p>
     <button id="start">开始检测</button>
-    <div class="result" id="result"></div>
+    <div id="result"></div>
 
-    <script>
-        const startButton = document.getElementById('start');
-        const resultDiv = document.getElementById('result');
-
-        startButton.addEventListener('click', async () => {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                resultDiv.textContent = "你的设备不支持音频输入功能。";
-                return;
-            }
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const analyser = audioContext.createAnalyser();
-                const source = audioContext.createMediaStreamSource(stream);
-                source.connect(analyser);
-
-                const bufferLength = analyser.fftSize;
-                const dataArray = new Uint8Array(bufferLength);
-
-                resultDiv.textContent = "请敲击西瓜...";
-                setTimeout(() => {
-                    analyser.getByteFrequencyData(dataArray);
-
-                    const frequencies = dataArray.filter(value => value > 0);
-                    const averageFrequency = frequencies.reduce((a, b) => a + b, 0) / frequencies.length;
-
-                    let maturity = "未知";
-                    if (averageFrequency > 189) {
-                        maturity = "生瓜";
-                    } else if (averageFrequency > 160) {
-                        maturity = "适熟";
-                    } else if (averageFrequency > 133) {
-                        maturity = "熟瓜";
-                    } else {
-                        maturity = "过熟";
-                    }
-
-                    resultDiv.textContent = `检测结果：${maturity}（频率：${Math.round(averageFrequency)} Hz）`;
-                    stream.getTracks().forEach(track => track.stop());
-                }, 3000);
-            } catch (err) {
-                resultDiv.textContent = "无法访问麦克风：" + err.message;
-            }
-        });
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
