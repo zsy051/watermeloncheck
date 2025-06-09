@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>麦克风音频检测</title>
+<title>音频检测系统</title>
 <style>
   body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
   canvas { border: 1px solid #ccc; display: block; margin: 20px auto; width: 90%; height: 200px; }
@@ -21,7 +21,6 @@
   </div>
   <canvas id="graphCanvas"></canvas>
   <p id="status">状态: 未开始检测</p>
-
 <script>
   const canvas = document.getElementById('graphCanvas');
   const ctx = canvas.getContext('2d');
@@ -31,19 +30,23 @@
   const status = document.getElementById('status');
 
   canvas.width = window.innerWidth * 0.9;
-  canvas.height = 200;
+  canvas.height = 300;
 
   let audioContext, analyser, microphoneStream, animationFrame;
   let isDetecting = false;
+  const maxTimeHistory = 3; // 显示最近 3 秒数据
 
-  function drawGraph(dataArray, bufferLength) {
+  function drawGraph(frequencyData, dbData, bufferLength) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 绘制频率曲线
     ctx.beginPath();
+    ctx.strokeStyle = 'green';
     const sliceWidth = canvas.width / bufferLength;
     let x = 0;
     for (let i = 0; i < bufferLength; i++) {
-      const v = dataArray[i] / 128.0;
-      const y = v * canvas.height / 2;
+      const v = frequencyData[i] / 256.0;
+      const y = canvas.height * (1 - v);
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -51,9 +54,22 @@
       }
       x += sliceWidth;
     }
-    ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.strokeStyle = 'green';
-    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 绘制分贝曲线
+    ctx.beginPath();
+    ctx.strokeStyle = 'blue';
+    x = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const v = (dbData[i] - analyser.minDecibels) / (analyser.maxDecibels - analyser.minDecibels);
+      const y = canvas.height * (1 - v);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
     ctx.stroke();
   }
 
@@ -64,18 +80,25 @@
       analyser = audioContext.createAnalyser();
       microphoneStream = audioContext.createMediaStreamSource(stream);
       microphoneStream.connect(analyser);
+
       analyser.fftSize = 2048;
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -10;
 
       const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
+      const frequencyData = new Uint8Array(bufferLength);
+      const dbData = new Float32Array(bufferLength);
 
       isDetecting = true;
       status.textContent = '状态: 检测中...';
 
       function loop() {
         if (!isDetecting) return;
-        analyser.getByteTimeDomainData(dataArray);
-        drawGraph(dataArray, bufferLength);
+
+        analyser.getByteFrequencyData(frequencyData);
+        analyser.getFloatFrequencyData(dbData);
+
+        drawGraph(frequencyData, dbData, bufferLength);
         animationFrame = requestAnimationFrame(loop);
       }
 
