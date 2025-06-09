@@ -11,7 +11,7 @@ let amplitudeArray = null;
 let stream = null;
 let animationId = null;
 
-const marginLeft = 100;
+const marginLeft = 200;
 const marginRight = 50;
 const marginTop = 20;
 const marginBottom = 40;
