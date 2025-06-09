@@ -10,13 +10,13 @@ let animationId;
 let startTime;
 let frequencyHistory = [];
 
-// 动态适配 canvas 尺寸
+// 初始化 Canvas 尺寸
 function resizeCanvas() {
     canvas.width = window.innerWidth - 40;
-    canvas.height = window.innerHeight / 3;
+    canvas.height = Math.min(window.innerHeight / 3, 300); // 限制高度为 300px
 }
 resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener('resize', resizeCanvas);
 
 function determineRipeness(freq) {
     if (freq > 189) return "生瓜";
