@@ -3,6 +3,15 @@ const resultDiv = document.getElementById("result");
 const canvas = document.getElementById("frequencyGraph");
 const ctx = canvas.getContext("2d");
 
+const updateIntervalInput = document.getElementById("updateIntervalInput");
+const updateIntervalValue = document.getElementById("updateIntervalValue");
+const decibelThresholdInput = document.getElementById("decibelThresholdInput");
+const decibelThresholdValue = document.getElementById("decibelThresholdValue");
+
+// 配置变量（初始值）
+let updateInterval = parseFloat(updateIntervalInput.value); // 秒
+let decibelThreshold = parseInt(decibelThresholdInput.value); // dB
+
 let audioContext, analyser, stream;
 let dataArray, bufferLength;
 let detecting = false;
@@ -11,11 +20,18 @@ let startTime;
 let frequencyHistory = [];
 let decibelHistory = [];
 
-// 配置变量（可修改）
-const updateInterval = 0.01; // 更新间隔（秒）
-const decibelThreshold = 40; // 分贝阈值
+// 监听滑块变化，实时更新变量和显示
+updateIntervalInput.addEventListener("input", () => {
+    updateInterval = parseFloat(updateIntervalInput.value);
+    updateIntervalValue.textContent = updateInterval.toFixed(3);
+});
 
-// 动态适配 canvas 尺寸
+decibelThresholdInput.addEventListener("input", () => {
+    decibelThreshold = parseInt(decibelThresholdInput.value);
+    decibelThresholdValue.textContent = decibelThreshold;
+});
+
+// 画布大小适配
 function resizeCanvas() {
     canvas.width = window.innerWidth - 40;
     canvas.height = window.innerHeight / 3;
@@ -110,15 +126,15 @@ function animateGraph() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 绘制坐标轴
+    // 坐标轴
     ctx.strokeStyle = "#888";
     ctx.beginPath();
     ctx.moveTo(50, 10);
     ctx.lineTo(50, canvas.height - 50);
-    ctx.lineTo(canvas.width - 10, canvas.height - 50);
+    ctx.lineTo(canvas.width - 50, canvas.height - 50);
     ctx.stroke();
 
-    // 绘制频率刻度
+    // 频率Y轴刻度 (左侧)
     const yLabels = [
         { value: 250, label: "250 Hz" },
         { value: 189, label: "生瓜" },
@@ -126,7 +142,7 @@ function animateGraph() {
         { value: 133, label: "熟瓜" },
         { value: 20, label: "20 Hz" },
     ];
-    yLabels.forEach((label) => {
+    yLabels.forEach(label => {
         const y = canvas.height - 50 - (label.value / 250) * (canvas.height - 60);
         ctx.fillText(label.label, 5, y + 3);
         ctx.beginPath();
@@ -135,39 +151,44 @@ function animateGraph() {
         ctx.stroke();
     });
 
-    // 绘制分贝刻度
+    // 分贝Y轴刻度 (右侧)
     for (let dB = decibelThreshold; dB <= 120; dB += 20) {
         const y = canvas.height - 50 - ((dB - decibelThreshold) / (120 - decibelThreshold)) * (canvas.height - 60);
         ctx.fillText(`${dB} dB`, canvas.width - 40, y + 3);
     }
 
-    // 绘制频率曲线
+    // 时间X轴刻度
+    const latestTime = frequencyHistory.length > 0 ? frequencyHistory[frequencyHistory.length - 1].time : 0;
+    for (let t = Math.floor(latestTime - 3); t <= latestTime; t++) {
+        const x = 50 + ((t - (latestTime - 3)) / 3) * (canvas.width - 100);
+        ctx.fillText(`${t}s`, x, canvas.height - 30);
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height - 55);
+        ctx.lineTo(x, canvas.height - 45);
+        ctx.stroke();
+    }
+
+    // 频率曲线
     ctx.strokeStyle = "#4CAF50";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    frequencyHistory.forEach((point, index) => {
-        const x = 50 + ((point.time - (frequencyHistory[frequencyHistory.length - 1].time - 3)) / 3) * (canvas.width - 60);
+    frequencyHistory.forEach((point, i) => {
+        const x = 50 + ((point.time - (latestTime - 3)) / 3) * (canvas.width - 100);
         const y = canvas.height - 50 - (point.frequency / 250) * (canvas.height - 60);
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
-    // 绘制分贝曲线
+    // 分贝曲线
     ctx.strokeStyle = "#FF5722";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    decibelHistory.forEach((point, index) => {
-        const x = 50 + ((point.time - (decibelHistory[decibelHistory.length - 1].time - 3)) / 3) * (canvas.width - 60);
+    decibelHistory.forEach((point, i) => {
+        const x = 50 + ((point.time - (latestTime - 3)) / 3) * (canvas.width - 100);
         const y = canvas.height - 50 - ((point.decibel - decibelThreshold) / (120 - decibelThreshold)) * (canvas.height - 60);
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
     });
     ctx.stroke();
 
