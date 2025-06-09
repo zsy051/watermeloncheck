@@ -57,7 +57,7 @@ function drawAxes() {
     ctx.lineTo(marginLeft, canvas.height - marginBottom);
     ctx.stroke();
     // 频率刻度
-    for (let f = 100; f <= 250; f += 30) {
+    for (let f = 100; f <= 350; f += 30) {
         const y = mapFreqToY(f);
         ctx.fillText(f + ' Hz', 5, y + 4);
         ctx.beginPath();
