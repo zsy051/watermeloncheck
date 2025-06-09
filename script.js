@@ -2,212 +2,155 @@ const toggleButton = document.getElementById('toggleButton');
 const canvas = document.getElementById('frequencyGraph');
 const ctx = canvas.getContext('2d');
 const displayCountInput = document.getElementById('displayCount');
-const amplitudeFilterInput = document.getElementById('noiseFilter'); // 这里是振幅过滤阈值，单位dB
+const amplitudeFilterInput = document.getElementById('noiseFilter');
 
-canvas.width = canvas.clientWidth;
-canvas.height = 400;
-
-let audioContext, analyser, dataArray, amplitudeArray;
-let history = [];
-let animationFrameId = null;
+let audioContext = null;
+let analyser = null;
+let dataArray = null;
+let amplitudeArray = null;
 let stream = null;
 
-function startDetection() {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(userStream => {
-        stream = userStream;
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const source = audioContext.createMediaStreamSource(stream);
+const marginLeft = 50;
+const marginRight = 50;
+const marginTop = 20;
+const marginBottom = 40;
 
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        amplitudeArray = new Float32Array(analyser.frequencyBinCount);
+const minFreq = 100;
+const maxFreq = 250;
+const freqRange = maxFreq - minFreq;
 
-        source.connect(analyser);
-        animateGraph();
-    }).catch(err => {
-        console.error('无法访问麦克风:', err);
-    });
+const minAmp = -60;
+const maxAmp = 0;
+const ampRange = maxAmp - minAmp;
+
+let history = []; // 存储历史帧数据，格式：[{ frequencies: [], amplitudes: [] }, ...]
+
+function resizeCanvas() {
+    canvas.width = canvas.clientWidth;
+    canvas.height = 400;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function mapFreqToY(freq) {
+    freq = Math.min(Math.max(freq, minFreq), maxFreq);
+    const h = canvas.height - marginTop - marginBottom;
+    return canvas.height - marginBottom - ((freq - minFreq) / freqRange) * h;
 }
 
-function stopDetection() {
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
-    }
-    if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-    }
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
-    history = [];
+function mapAmpToY(amp) {
+    amp = Math.min(Math.max(amp, minAmp), maxAmp);
+    const h = canvas.height - marginTop - marginBottom;
+    return canvas.height - marginBottom - ((amp - minAmp) / ampRange) * h;
 }
 
-function toggleDetection() {
-    if (audioContext) {
-        toggleButton.textContent = '开始检测';
-        stopDetection();
-    } else {
-        toggleButton.textContent = '停止检测';
-        startDetection();
-    }
-}
-
-function animateGraph() {
-    if (!audioContext) return;
-
-    analyser.getByteFrequencyData(dataArray);
-    analyser.getFloatFrequencyData(amplitudeArray);
-
-    const amplitudeFilter = parseFloat(amplitudeFilterInput.value); // 例如 -40 dB
-    const displayCount = parseInt(displayCountInput.value);
-
-    const sampleRate = audioContext.sampleRate;
-    const binCount = analyser.frequencyBinCount;
-
-    // 采样频率范围 100Hz ~ 450Hz
-    const minFreq = 100;
-    const maxFreq = 450;
-
-    const frequencies = [];
-    const amplitudes = [];
-
-    for (let i = 0; i < binCount; i++) {
-        const freq = i * (sampleRate / 2) / binCount;  // 当前频率
-        if (freq < minFreq || freq > maxFreq) continue;
-
-        const amp = amplitudeArray[i]; // 频率对应的振幅（单位dB）
-
-        if (amp < amplitudeFilter) continue; // 低于阈值过滤
-
-        frequencies.push(freq);
-        amplitudes.push(amp);
-    }
-
-    // 记录历史（模拟3秒内，假设60fps）
-    history.push({ frequencies, amplitudes });
-
-    if (history.length > displayCount * 60) { // 这里的displayCount是秒数
-        history.shift();
-    }
-
-    // 开始绘制
-
+function drawAxes() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const marginLeft = 50;
-    const marginRight = 50;
-    const marginTop = 30;
-    const marginBottom = 50;
-
-    const width = canvas.width - marginLeft - marginRight;
-    const height = canvas.height - marginTop - marginBottom;
-
-    // 画坐标轴
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#000';
 
-    // y轴左（频率100~250Hz）
+    // Y轴左 - 频率轴 100~250Hz
     ctx.beginPath();
     ctx.moveTo(marginLeft, marginTop);
-    ctx.lineTo(marginLeft, marginTop + height);
+    ctx.lineTo(marginLeft, canvas.height - marginBottom);
     ctx.stroke();
-
-    // y轴右（振幅0 ~ -60 dB）
-    ctx.beginPath();
-    ctx.moveTo(canvas.width - marginRight, marginTop);
-    ctx.lineTo(canvas.width - marginRight, marginTop + height);
-    ctx.stroke();
-
-    // x轴（时间）
-    ctx.beginPath();
-    ctx.moveTo(marginLeft, marginTop + height);
-    ctx.lineTo(canvas.width - marginRight, marginTop + height);
-    ctx.stroke();
-
-    // 左侧y轴标签（频率）
-    ctx.fillStyle = '#4CAF50';
-    ctx.font = '12px Arial';
-    for (let f = 100; f <= 450; f += 30) {
-        const y = marginTop + height - ((f - 100) / 150) * height;
-        ctx.fillText(`${f}Hz`, 5, y + 4);
+    // 频率刻度
+    for (let f = 100; f <= 250; f += 30) {
+        const y = mapFreqToY(f);
+        ctx.fillText(f + ' Hz', 5, y + 4);
         ctx.beginPath();
         ctx.moveTo(marginLeft - 5, y);
         ctx.lineTo(marginLeft, y);
         ctx.stroke();
     }
+    ctx.fillText('频率 (Hz)', marginLeft - 40, marginTop - 5);
 
-    // 右侧y轴标签（振幅）
-    ctx.fillStyle = '#FF0000';
-    for (let db = 0; db >= -60; db -= 15) {
-        const y = marginTop + height - ((db - 0) / (-60 - 0)) * height;
-        ctx.fillText(`${db}dB`, canvas.width - marginRight + 5, y + 4);
+    // Y轴右 - 振幅轴 0 ~ -60dB
+    ctx.beginPath();
+    ctx.moveTo(canvas.width - marginRight, marginTop);
+    ctx.lineTo(canvas.width - marginRight, canvas.height - marginBottom);
+    ctx.stroke();
+    // 振幅刻度
+    for (let a = 0; a >= -60; a -= 15) {
+        const y = mapAmpToY(a);
+        ctx.fillText(a + ' dB', canvas.width - marginRight + 10, y + 4);
         ctx.beginPath();
         ctx.moveTo(canvas.width - marginRight, y);
         ctx.lineTo(canvas.width - marginRight + 5, y);
         ctx.stroke();
     }
+    ctx.fillText('振幅 (dB)', canvas.width - marginRight + 10, marginTop - 5);
 
-    // x轴标签，时间秒数，从历史长度倒数绘制
-    ctx.fillStyle = '#000';
-    ctx.textAlign = 'center';
-    ctx.font = '12px Arial';
-    for (let i = 0; i <= displayCount; i++) {
-        const x = marginLeft + (width * i) / displayCount;
-        ctx.fillText(`${displayCount - i}s`, x, marginTop + height + 20);
-        ctx.beginPath();
-        ctx.moveTo(x, marginTop + height);
-        ctx.lineTo(x, marginTop + height + 5);
-        ctx.stroke();
-    }
-
-    // 画频率曲线（绿色）
-    ctx.strokeStyle = '#4CAF50';
-    ctx.lineWidth = 2;
+    // X轴时间轴
     ctx.beginPath();
-
-    for (let i = 0; i < history.length; i++) {
-        const freqPoints = history[i].frequencies;
-        if (freqPoints.length === 0) continue;
-        const x = marginLeft + (width * i) / (displayCount * 60);
-        // 取频率平均值作为该帧频率点
-        const avgFreq = freqPoints.reduce((a, b) => a + b, 0) / freqPoints.length;
-        const y = marginTop + height - ((avgFreq - 100) / 150) * height;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
+    ctx.moveTo(marginLeft, canvas.height - marginBottom);
+    ctx.lineTo(canvas.width - marginRight, canvas.height - marginBottom);
     ctx.stroke();
-
-    // 画振幅曲线（红色）
-    ctx.strokeStyle = '#FF0000';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
-    for (let i = 0; i < history.length; i++) {
-        const ampPoints = history[i].amplitudes;
-        if (ampPoints.length === 0) continue;
-        const x = marginLeft + (width * i) / (displayCount * 60);
-        // 取振幅平均值作为该帧振幅点
-        const avgAmp = ampPoints.reduce((a, b) => a + b, 0) / ampPoints.length;
-        // 振幅范围0到-60dB，坐标需要转成正向像素 y
-        const y = marginTop + height - ((avgAmp - 0) / (-60 - 0)) * height;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    animationFrameId = requestAnimationFrame(animateGraph);
+    ctx.fillText('时间 (最近帧)', canvas.width / 2 - 30, canvas.height - 10);
 }
 
-toggleButton.addEventListener('click', () => {
-    if (audioContext) {
-        toggleButton.textContent = '开始检测';
-        stopDetection();
-    } else {
-        toggleButton.textContent = '停止检测';
-        startDetection();
-    }
-});
+function drawCurves() {
+    if (history.length === 0) return;
+
+    const displayCount = parseInt(displayCountInput.value) || 3; // 秒数
+    const fps = 60;
+    const maxFrames = displayCount * fps;
+    const frames = history.slice(-maxFrames);
+
+    // 绘制频率曲线 - 绿色
+    ctx.strokeStyle = 'green';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    frames.forEach((frame, idx) => {
+        frame.frequencies.forEach((freq, i) => {
+            // X坐标：时间轴，帧序号
+            // Y坐标：频率映射
+            const x = marginLeft + (idx / maxFrames) * (canvas.width - marginLeft - marginRight);
+            const y = mapFreqToY(freq);
+
+            if (idx === 0 && i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+    });
+    ctx.stroke();
+
+    // 绘制振幅曲线 - 红色
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    frames.forEach((frame, idx) => {
+        frame.amplitudes.forEach((amp, i) => {
+            const x = marginLeft + (idx / maxFrames) * (canvas.width - marginLeft - marginRight);
+            const y = mapAmpToY(amp);
+
+            if (idx === 0 && i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+    });
+    ctx.stroke();
+}
+
+function animate() {
+    if (!audioContext) return;
+
+    analyser.getByteFrequencyData(dataArray);
+    analyser.getFloatFrequencyData(amplitudeArray);
+
+    const amplitudeFilter = parseFloat(amplitudeFilterInput.value) || -40;
+
+    const sampleRate = audioContext.sampleRate;
+    const binCount = analyser.frequencyBinCount;
+
+    const freqs = [];
+    const amps = [];
+
+    for (let i = 0; i < binCount; i++) {
+        const freq = i * sampleRate / 2 / binCount;
+        if (freq < minFreq || freq > maxFreq) continue;
+
+        const amp = amplitudeArray[i];
+        if (amp < amplitudeFilte
