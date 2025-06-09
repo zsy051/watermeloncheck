@@ -9,6 +9,7 @@ let detecting = false;
 let animationId;
 let startTime;
 let frequencyHistory = [];
+const minDecibels = -50; // 设置分贝过滤阈值
 
 // 动态适配 canvas 尺寸
 function resizeCanvas() {
@@ -34,6 +35,7 @@ async function startDetection() {
         source.connect(analyser);
 
         analyser.fftSize = 2048;
+        analyser.minDecibels = minDecibels; // 设置分贝阈值
         bufferLength = analyser.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
 
@@ -72,7 +74,10 @@ function detectFrequency() {
     const nyquist = audioContext.sampleRate / 2;
     const frequency = (maxIndex / bufferLength) * nyquist;
 
-    if (frequency >= 20 && frequency <= 250) {
+    // 检测分贝并过滤环境音
+    const signalEnergy = dataArray.reduce((sum, value) => sum + value ** 2, 0) / bufferLength;
+    const decibels = 10 * Math.log10(signalEnergy);
+    if (frequency >= 20 && frequency <= 250 && decibels > minDecibels) {
         const timeElapsed = (Date.now() - startTime) / 1000; // 转换为秒
         frequencyHistory.push({ time: timeElapsed, frequency });
 
@@ -83,7 +88,7 @@ function detectFrequency() {
         resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz, 成熟度: ${ripeness}`;
     }
 
-    requestAnimationFrame(detectFrequency);
+    setTimeout(detectFrequency, 33); // 约 30 帧每秒
 }
 
 function animateGraph() {
