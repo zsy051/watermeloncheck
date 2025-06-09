@@ -1,7 +1,7 @@
-const toggleButton = document.getElementById('toggleButton');
-const resultDiv = document.getElementById('result');
-const canvas = document.getElementById('frequencyGraph');
-const ctx = canvas.getContext('2d');
+const toggleButton = document.getElementById("toggleButton");
+const resultDiv = document.getElementById("result");
+const canvas = document.getElementById("frequencyGraph");
+const ctx = canvas.getContext("2d");
 
 let audioContext, analyser, stream;
 let dataArray, bufferLength;
@@ -9,6 +9,11 @@ let detecting = false;
 let animationId;
 let startTime;
 let frequencyHistory = [];
+let decibelHistory = [];
+
+// 配置变量（可修改）
+const updateInterval = 0.01; // 更新间隔（秒）
+const decibelThreshold = 40; // 分贝阈值
 
 // 动态适配 canvas 尺寸
 function resizeCanvas() {
@@ -39,6 +44,7 @@ async function startDetection() {
 
         detecting = true;
         frequencyHistory = [];
+        decibelHistory = [];
         startTime = Date.now();
         resultDiv.textContent = "正在检测...";
         animateGraph();
@@ -63,7 +69,9 @@ function detectFrequency() {
     analyser.getByteFrequencyData(dataArray);
 
     let maxIndex = 0;
-    for (let i = 1; i < dataArray.length; i++) {
+    let totalAmplitude = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+        totalAmplitude += dataArray[i];
         if (dataArray[i] > dataArray[maxIndex]) {
             maxIndex = i;
         }
@@ -72,22 +80,26 @@ function detectFrequency() {
     const nyquist = audioContext.sampleRate / 2;
     const frequency = (maxIndex / bufferLength) * nyquist;
 
-    if (frequency >= 20 && frequency <= 250) {
-        const timeElapsed = (Date.now() - startTime) / 1000; // 以秒计时
+    // 计算分贝
+    const rms = Math.sqrt(totalAmplitude / dataArray.length);
+    const decibel = 20 * Math.log10(rms);
 
-        // 采样：仅保留每隔 10ms 的点
+    if (frequency >= 20 && frequency <= 250 && decibel >= decibelThreshold) {
+        const timeElapsed = (Date.now() - startTime) / 1000;
+
         if (
-            frequencyHistory.length === 0 || 
-            timeElapsed - frequencyHistory[frequencyHistory.length - 1].time > 0.01
+            frequencyHistory.length === 0 ||
+            timeElapsed - frequencyHistory[frequencyHistory.length - 1].time > updateInterval
         ) {
             frequencyHistory.push({ time: timeElapsed, frequency });
+            decibelHistory.push({ time: timeElapsed, decibel });
         }
 
-        // 保留最近 3 秒的数据
         frequencyHistory = frequencyHistory.filter((point) => point.time >= timeElapsed - 3);
+        decibelHistory = decibelHistory.filter((point) => point.time >= timeElapsed - 3);
 
         const ripeness = determineRipeness(frequency);
-        resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz, 成熟度: ${ripeness}`;
+        resultDiv.textContent = `频率: ${frequency.toFixed(2)} Hz, 分贝: ${decibel.toFixed(2)} dB, 成熟度: ${ripeness}`;
     }
 
     requestAnimationFrame(detectFrequency);
@@ -123,15 +135,10 @@ function animateGraph() {
         ctx.stroke();
     });
 
-    // 绘制时间刻度
-    const xEndTime = frequencyHistory.length > 0 ? frequencyHistory[frequencyHistory.length - 1].time : 0;
-    for (let i = Math.floor(xEndTime - 3); i <= xEndTime; i++) {
-        const x = 50 + ((i - (xEndTime - 3)) / 3) * (canvas.width - 60);
-        ctx.fillText(`${i}s`, x, canvas.height - 30);
-        ctx.beginPath();
-        ctx.moveTo(x, canvas.height - 55);
-        ctx.lineTo(x, canvas.height - 45);
-        ctx.stroke();
+    // 绘制分贝刻度
+    for (let dB = decibelThreshold; dB <= 120; dB += 20) {
+        const y = canvas.height - 50 - ((dB - decibelThreshold) / (120 - decibelThreshold)) * (canvas.height - 60);
+        ctx.fillText(`${dB} dB`, canvas.width - 40, y + 3);
     }
 
     // 绘制频率曲线
@@ -139,8 +146,23 @@ function animateGraph() {
     ctx.lineWidth = 2;
     ctx.beginPath();
     frequencyHistory.forEach((point, index) => {
-        const x = 50 + ((point.time - (xEndTime - 3)) / 3) * (canvas.width - 60);
+        const x = 50 + ((point.time - (frequencyHistory[frequencyHistory.length - 1].time - 3)) / 3) * (canvas.width - 60);
         const y = canvas.height - 50 - (point.frequency / 250) * (canvas.height - 60);
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.stroke();
+
+    // 绘制分贝曲线
+    ctx.strokeStyle = "#FF5722";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    decibelHistory.forEach((point, index) => {
+        const x = 50 + ((point.time - (decibelHistory[decibelHistory.length - 1].time - 3)) / 3) * (canvas.width - 60);
+        const y = canvas.height - 50 - ((point.decibel - decibelThreshold) / (120 - decibelThreshold)) * (canvas.height - 60);
         if (index === 0) {
             ctx.moveTo(x, y);
         } else {
