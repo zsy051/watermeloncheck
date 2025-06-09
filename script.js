@@ -223,7 +223,7 @@ toggleButton.addEventListener('click', async () => {
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
-            analyser.fftSize = 2048;
+            analyser.fftSize = 4096;
 
             const source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
