@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>西瓜成熟度检测</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h1>西瓜成熟度检测</h1>
-    <p>点击“开始检测”，然后轻敲西瓜，系统会显示实时频率和成熟度曲线。</p>
+    <div class="controls">
+        <label for="displayCount">每面显示的次数:</label>
+        <input type="number" id="displayCount" value="3" min="1" max="10">
+        <label for="noiseFilter">过滤噪音 (Hz):</label>
+        <input type="number" id="noiseFilter" value="20" min="0" max="100">
+    </div>
     <button id="toggleButton">开始检测</button>
-    <div id="result"></div>
     <canvas id="frequencyGraph"></canvas>
     <script src="script.js"></script>
 </body>
