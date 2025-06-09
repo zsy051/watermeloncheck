@@ -19,22 +19,21 @@ const minFreq = 100;
 const maxFreq = 400;
 const freqRange = maxFreq - minFreq;
 
-const minAmp = -60;
+const minAmp = -80;  // 适应输入范围
 const maxAmp = 0;
 const ampRange = maxAmp - minAmp;
 
-let history = []; // 每帧存储 { peakFreq: Number, peakAmp: Number }
+let history = [];
 
 function resizeCanvas() {
-    // 适配高清屏幕
     const dpr = window.devicePixelRatio || 1;
     canvas.width = canvas.clientWidth * dpr;
     canvas.height = 400 * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // 重置矩阵
     ctx.scale(dpr, dpr);
 }
 resizeCanvas();
 window.addEventListener('resize', () => {
-    // 重置scale前清除canvas
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     resizeCanvas();
 });
@@ -61,7 +60,7 @@ function drawAxes() {
     ctx.font = '12px Arial';
     ctx.fillStyle = '#000';
 
-    // 频率 Y轴 左边 100~400Hz
+    // 频率 Y轴 左边
     ctx.beginPath();
     ctx.moveTo(marginLeft, marginTop);
     ctx.lineTo(marginLeft, h - marginBottom);
@@ -76,12 +75,12 @@ function drawAxes() {
     }
     ctx.fillText('频率 (Hz)', marginLeft - 40, marginTop - 5);
 
-    // 振幅 Y轴 右边 0 ~ -60 dB
+    // 振幅 Y轴 右边
     ctx.beginPath();
     ctx.moveTo(w - marginRight, marginTop);
     ctx.lineTo(w - marginRight, h - marginBottom);
     ctx.stroke();
-    for (let a = 0; a >= -60; a -= 15) {
+    for (let a = 0; a >= minAmp; a -= 20) {
         const y = mapAmpToY(a);
         ctx.fillText(a + ' dB', w - marginRight + 10, y + 4);
         ctx.beginPath();
@@ -99,14 +98,13 @@ function drawAxes() {
     ctx.fillText('时间 (最近帧)', w / 2 - 30, h - 10);
 }
 
-// 绘制频率和振幅峰值随时间变化曲线
 function drawCurves() {
     if (history.length === 0) return;
 
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
 
-    const displayCount = parseInt(displayCountInput.value) || 3; // 秒数
+    const displayCount = parseInt(displayCountInput.value) || 3;
     const fps = 60;
     const maxFrames = displayCount * fps;
     const frames = history.slice(-maxFrames);
@@ -115,7 +113,6 @@ function drawCurves() {
     ctx.strokeStyle = 'green';
     ctx.lineWidth = 2;
     ctx.beginPath();
-
     frames.forEach((frame, idx) => {
         const x = marginLeft + (idx / maxFrames) * (w - marginLeft - marginRight);
         const y = mapFreqToY(frame.peakFreq);
@@ -128,7 +125,6 @@ function drawCurves() {
     ctx.strokeStyle = 'red';
     ctx.lineWidth = 2;
     ctx.beginPath();
-
     frames.forEach((frame, idx) => {
         const x = marginLeft + (idx / maxFrames) * (w - marginLeft - marginRight);
         const y = mapAmpToY(frame.peakAmp);
@@ -155,7 +151,7 @@ function animate() {
         const freq = i * sampleRate / 2 / binCount;
         if (freq < minFreq || freq > maxFreq) continue;
 
-        // 计算分贝（-∞到0dB近似）
+        // 计算分贝，大致近似
         const amp = 20 * Math.log10(dataArray[i] / 255);
         if (amp < amplitudeFilter) continue;
 
@@ -165,14 +161,12 @@ function animate() {
         }
     }
 
-    // 如果没找到符合条件的峰，设置为默认值
     if (peakAmp === minAmp) {
         peakFreq = minFreq;
     }
 
     history.push({ peakFreq, peakAmp });
 
-    // 限制history长度
     const displayCount = parseInt(displayCountInput.value) || 3;
     const maxFrames = displayCount * 60;
     if (history.length > maxFrames) {
@@ -210,6 +204,8 @@ toggleButton.addEventListener('click', async () => {
         try {
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            await audioContext.resume();
+
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 2048;
 
@@ -224,6 +220,7 @@ toggleButton.addEventListener('click', async () => {
             animate();
         } catch (err) {
             alert('无法访问麦克风：' + err.message);
+            console.error(err);
         }
     }
 });
