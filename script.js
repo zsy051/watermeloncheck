@@ -66,50 +66,27 @@ function drawAxes() {
 
         // 绘制区间文字
         ctx.fillStyle = color;
-        ctx.fillRect(marginLeft - 60, startY, 50, endY - startY);
-
+        ctx.fillRect(marginLeft - 70, startY, 60, endY - startY); // 调整宽度
         ctx.fillStyle = '#fff';
         const textY = (startY + endY) / 2; // 中心位置
         ctx.textAlign = 'center';
-        ctx.fillText(label, marginLeft - 35, textY + 4);
+        ctx.fillText(label, marginLeft - 40, textY + 4); // 文字水平位置
     });
 
-    // 绘制频率 Y轴 左边 100~400Hz
+    // 绘制频率 Y轴 左边
     ctx.beginPath();
     ctx.moveTo(marginLeft, marginTop);
     ctx.lineTo(marginLeft, canvas.height - marginBottom);
     ctx.stroke();
     for (let f = 100; f <= 400; f += 50) {
         const y = mapFreqToY(f);
-        ctx.fillText(f + ' Hz', 5, y + 4);
+        ctx.fillText(f + ' Hz', marginLeft - 70, y + 4); // 调整文字偏移
         ctx.beginPath();
         ctx.moveTo(marginLeft - 5, y);
         ctx.lineTo(marginLeft, y);
         ctx.stroke();
     }
     ctx.fillText('频率 (Hz)', marginLeft - 40, marginTop - 5);
-
-    // 振幅 Y轴 右边 0 ~ -60 dB
-    ctx.beginPath();
-    ctx.moveTo(canvas.width - marginRight, marginTop);
-    ctx.lineTo(canvas.width - marginRight, canvas.height - marginBottom);
-    ctx.stroke();
-    for (let a = 0; a >= -60; a -= 15) {
-        const y = mapAmpToY(a);
-        ctx.fillText(a + ' dB', canvas.width - marginRight + 10, y + 4);
-        ctx.beginPath();
-        ctx.moveTo(canvas.width - marginRight, y);
-        ctx.lineTo(canvas.width - marginRight + 5, y);
-        ctx.stroke();
-    }
-    ctx.fillText('振幅 (dB)', canvas.width - marginRight + 10, marginTop - 5);
-
-    // 时间 X轴
-    ctx.beginPath();
-    ctx.moveTo(marginLeft, canvas.height - marginBottom);
-    ctx.lineTo(canvas.width - marginRight, canvas.height - marginBottom);
-    ctx.stroke();
-    ctx.fillText('时间 (最近帧)', canvas.width / 2 - 30, canvas.height - 10);
 }
 
 function drawCurves() {
