@@ -1,64 +1,11 @@
-const toggleButton = document.getElementById('toggleButton');
-const resultDiv = document.getElementById('result');
-const canvas = document.getElementById('frequencyGraph');
-const ctx = canvas.getContext('2d');
-
-let audioContext, analyser, stream;
-let dataArray, bufferLength;
-let detecting = false;
-let animationId;
-let startTime;
-let frequencyHistory = [];
-
-// 动态适配 canvas 尺寸
-function resizeCanvas() {
-    canvas.width = window.innerWidth - 40;
-    canvas.height = window.innerHeight / 3;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
-
-function determineRipeness(freq) {
-    if (freq > 189) return "生瓜";
-    if (freq >= 160 && freq <= 189) return "适熟";
-    if (freq >= 133 && freq < 160) return "熟瓜";
-    return "过熟";
-}
-
-async function startDetection() {
-    try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        const source = audioContext.createMediaStreamSource(stream);
-        source.connect(analyser);
-
-        analyser.fftSize = 2048;
-        bufferLength = analyser.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
-
-        detecting = true;
-        frequencyHistory = [];
-        startTime = Date.now();
-        resultDiv.textContent = "正在检测...";
-        animateGraph();
-        detectFrequency();
-    } catch (err) {
-        resultDiv.textContent = "无法访问麦克风：" + err.message;
-    }
-}
-
-function stopDetection() {
-    detecting = false;
-    if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-    }
-    cancelAnimationFrame(animationId);
-    resultDiv.textContent = "检测已停止";
-}
+let lastUpdateTime = 0; // 上次更新的时间戳
+const updateInterval = 16; // 每次更新的最小间隔（约 60fps）
 
 function detectFrequency() {
     if (!detecting) return;
+
+    const currentTime = Date.now();
+    const timeElapsed = (currentTime - startTime) / 1000; // 秒
 
     analyser.getByteFrequencyData(dataArray);
 
@@ -72,11 +19,11 @@ function detectFrequency() {
     const nyquist = audioContext.sampleRate / 2;
     const frequency = (maxIndex / bufferLength) * nyquist;
 
-    if (frequency >= 20 && frequency <= 250) {
-        const timeElapsed = (Date.now() - startTime) / 1000; // 转换为秒
+    if (frequency >= 20 && frequency <= 250 && currentTime - lastUpdateTime > updateInterval) {
         frequencyHistory.push({ time: timeElapsed, frequency });
+        lastUpdateTime = currentTime;
 
-        // 仅保留最近 3 秒内的数据
+        // 保持最近 3 秒数据
         frequencyHistory = frequencyHistory.filter((point) => point.time >= timeElapsed - 3);
 
         const ripeness = determineRipeness(frequency);
@@ -145,13 +92,3 @@ function animateGraph() {
 
     animationId = requestAnimationFrame(animateGraph);
 }
-
-toggleButton.addEventListener("click", () => {
-    if (detecting) {
-        stopDetection();
-        toggleButton.textContent = "开始检测";
-    } else {
-        startDetection();
-        toggleButton.textContent = "停止检测";
-    }
-});
