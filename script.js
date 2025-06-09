@@ -142,13 +142,13 @@ function animate() {
     const amplitudeFilter = parseFloat(amplitudeFilterInput.value) || -40;
 
     const sampleRate = audioContext.sampleRate;
-    const binCount = analyser.frequencyBinCount;
-
+    const fftSize = analyser.fftSize;
+    
     let peakFreq = minFreq;
     let peakAmp = minAmp;
 
     for (let i = 0; i < binCount; i++) {
-        const freq = i * sampleRate / 2 / binCount;
+    const freq = i * sampleRate / fftSize;
         if (freq < minFreq || freq > maxFreq) continue;
 
         // 计算分贝，大致近似
