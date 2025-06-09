@@ -64,18 +64,17 @@ function drawAxes() {
         const startY = mapFreqToY(range[1]);
         const endY = mapFreqToY(range[0]);
 
-        // 绘制区间背景
-        ctx.fillStyle = color;
-        ctx.fillRect(marginLeft - 45, startY, 40, endY - startY);
-
         // 绘制区间文字
+        ctx.fillStyle = color;
+        ctx.fillRect(marginLeft - 60, startY, 50, endY - startY);
+
         ctx.fillStyle = '#fff';
         const textY = (startY + endY) / 2; // 中心位置
         ctx.textAlign = 'center';
-        ctx.fillText(label, marginLeft - 25, textY + 4);
+        ctx.fillText(label, marginLeft - 35, textY + 4);
     });
 
-    // 频率 Y轴 左边 100~400Hz
+    // 绘制频率 Y轴 左边 100~400Hz
     ctx.beginPath();
     ctx.moveTo(marginLeft, marginTop);
     ctx.lineTo(marginLeft, canvas.height - marginBottom);
@@ -113,6 +112,34 @@ function drawAxes() {
     ctx.fillText('时间 (最近帧)', canvas.width / 2 - 30, canvas.height - 10);
 }
 
+function drawCurves() {
+    if (history.length === 0) return;
+
+    const displayCount = parseInt(displayCountInput.value) || 3;
+    const fps = 60;
+    const maxFrames = displayCount * fps;
+    const frames = history.slice(-maxFrames);
+
+    // 绘制曲线
+    frames.forEach((frame, idx) => {
+        frame.frequencies.forEach((freq, i) => {
+            let color = 'gray';
+            if (freq < 133) color = '#d35400'; // 过熟瓜
+            else if (freq < 160) color = '#27ae60'; // 熟瓜
+            else if (freq < 189) color = '#f1c40f'; // 适熟瓜
+            else color = '#c0392b'; // 生瓜
+
+            const x = marginLeft + (idx / maxFrames) * (canvas.width - marginLeft - marginRight);
+            const y = mapFreqToY(freq);
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            if (i === 0) ctx.beginPath();
+            ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+    });
+}
 
 function drawCurves() {
     if (history.length === 0) return;
