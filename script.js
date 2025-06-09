@@ -143,23 +143,24 @@ function animate() {
 
     const sampleRate = audioContext.sampleRate;
     const fftSize = analyser.fftSize;
+    const binCount = analyser.frequencyBinCount;
     
     let peakFreq = minFreq;
     let peakAmp = minAmp;
-
+    
     for (let i = 0; i < binCount; i++) {
-    const freq = i * sampleRate / fftSize;
+        const freq = i * sampleRate / fftSize;
         if (freq < minFreq || freq > maxFreq) continue;
-
-        // 计算分贝，大致近似
+    
         const amp = 20 * Math.log10(dataArray[i] / 255);
         if (amp < amplitudeFilter) continue;
-
+    
         if (amp > peakAmp) {
             peakAmp = amp;
             peakFreq = freq;
         }
     }
+
 
     if (peakAmp === minAmp) {
         peakFreq = minFreq;
