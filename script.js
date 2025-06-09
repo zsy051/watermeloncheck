@@ -4,16 +4,18 @@ const ctx = canvas.getContext('2d');
 const displayCountInput = document.getElementById('displayCount');
 const noiseFilterInput = document.getElementById('noiseFilter');
 
-canvas.width = window.innerWidth * 0.8;
+canvas.width = canvas.clientWidth;
 canvas.height = 400;
 
 let audioContext, analyser, dataArray, amplitudeArray;
 let frequencyHistory = [];
 let amplitudeHistory = [];
-let detecting = false;
+let animationFrameId = null;
+let stream = null;
 
 function startDetection() {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(userStream => {
+        stream = userStream;
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = audioContext.createMediaStreamSource(stream);
 
@@ -30,26 +32,32 @@ function startDetection() {
 }
 
 function stopDetection() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
     if (audioContext) {
         audioContext.close();
         audioContext = null;
     }
-    detecting = false;
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+    }
 }
 
 function toggleDetection() {
-    if (detecting) {
+    if (audioContext) {
         toggleButton.textContent = '开始检测';
         stopDetection();
     } else {
         toggleButton.textContent = '停止检测';
-        detecting = true;
         startDetection();
     }
 }
 
 function animateGraph() {
-    if (!detecting) return;
+    if (!audioContext) return;
 
     analyser.getByteFrequencyData(dataArray);
     analyser.getFloatFrequencyData(amplitudeArray);
@@ -61,7 +69,7 @@ function animateGraph() {
     const filteredAmplitudes = [];
     for (let i = 0; i < dataArray.length; i++) {
         const freq = (i / dataArray.length) * (audioContext.sampleRate / 2);
-        if (freq >= noiseFilter) {
+        if (freq >= noiseFilter && freq <= 250) {
             filteredFrequencies.push(freq);
             filteredAmplitudes.push(amplitudeArray[i]);
         }
@@ -70,51 +78,15 @@ function animateGraph() {
     frequencyHistory.push([...filteredFrequencies]);
     amplitudeHistory.push([...filteredAmplitudes]);
 
-    // Maintain history size
-    if (frequencyHistory.length > displayCount) {
+    if (frequencyHistory.length > displayCount * 60) {
         frequencyHistory.shift();
-    }
-    if (amplitudeHistory.length > displayCount) {
         amplitudeHistory.shift();
     }
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw axes
-    ctx.strokeStyle = '#ccc';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(50, 10);
-    ctx.lineTo(50, canvas.height - 50);
-    ctx.lineTo(canvas.width - 10, canvas.height - 50);
-    ctx.stroke();
-
-    // Frequency labels (left Y-axis)
-    const freqRange = [100, 250];
-    const freqHeight = canvas.height - 60;
-    freqRange.forEach(freq => {
-        const y = canvas.height - 50 - ((freq - 100) / 150) * freqHeight;
-        ctx.fillStyle = '#000';
-        ctx.fillText(`${freq} Hz`, 10, y);
-        ctx.beginPath();
-        ctx.moveTo(45, y);
-        ctx.lineTo(55, y);
-        ctx.stroke();
-    });
-
-    // Amplitude labels (right Y-axis)
-    const ampRange = [0, -60];
-    const ampHeight = canvas.height - 60;
-    ampRange.forEach(amp => {
-        const y = canvas.height - 50 - ((amp - (-60)) / 60) * ampHeight;
-        ctx.fillStyle = '#f00';
-        ctx.fillText(`${amp} dB`, canvas.width - 40, y);
-        ctx.beginPath();
-        ctx.moveTo(canvas.width - 45, y);
-        ctx.lineTo(canvas.width - 55, y);
-        ctx.stroke();
-    });
+    const freqHeight = canvas.height - 50;
+    const ampHeight = canvas.height - 50;
 
     // Draw frequency curve
     ctx.strokeStyle = '#4CAF50';
@@ -150,7 +122,7 @@ function animateGraph() {
     });
     ctx.stroke();
 
-    requestAnimationFrame(animateGraph);
+    animationFrameId = requestAnimationFrame(animateGraph);
 }
 
 toggleButton.addEventListener('click', toggleDetection);
