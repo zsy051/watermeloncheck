@@ -16,7 +16,7 @@ const marginTop = 20;
 const marginBottom = 40;
 
 const minFreq = 100;
-const maxFreq = 250;
+const maxFreq = 350;
 const freqRange = maxFreq - minFreq;
 
 const minAmp = -60;
