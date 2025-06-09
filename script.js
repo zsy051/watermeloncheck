@@ -52,6 +52,29 @@ function drawAxes() {
     ctx.font = '12px Arial';
     ctx.fillStyle = '#000';
 
+    // 添加频率区间标注
+    const ranges = [
+        { label: '过熟瓜', range: [100, 133], color: '#d35400' },
+        { label: '熟瓜', range: [133, 160], color: '#27ae60' },
+        { label: '适熟瓜', range: [160, 189], color: '#f1c40f' },
+        { label: '生瓜', range: [189, 400], color: '#c0392b' }
+    ];
+
+    ranges.forEach(({ label, range, color }) => {
+        const startY = mapFreqToY(range[1]);
+        const endY = mapFreqToY(range[0]);
+
+        // 绘制区间背景
+        ctx.fillStyle = color;
+        ctx.fillRect(marginLeft - 45, startY, 40, endY - startY);
+
+        // 绘制区间文字
+        ctx.fillStyle = '#fff';
+        const textY = (startY + endY) / 2; // 中心位置
+        ctx.textAlign = 'center';
+        ctx.fillText(label, marginLeft - 25, textY + 4);
+    });
+
     // 频率 Y轴 左边 100~400Hz
     ctx.beginPath();
     ctx.moveTo(marginLeft, marginTop);
@@ -66,23 +89,6 @@ function drawAxes() {
         ctx.stroke();
     }
     ctx.fillText('频率 (Hz)', marginLeft - 40, marginTop - 5);
-
-    // 添加频率区间标注
-    const ranges = [
-        { label: '过熟瓜', range: [100, 133], color: '#d35400' },
-        { label: '熟瓜', range: [133, 160], color: '#27ae60' },
-        { label: '适熟瓜', range: [160, 189], color: '#f1c40f' },
-        { label: '生瓜', range: [189, 400], color: '#c0392b' }
-    ];
-
-    ranges.forEach(({ label, range, color }) => {
-        const startY = mapFreqToY(range[1]);
-        const endY = mapFreqToY(range[0]);
-        ctx.fillStyle = color;
-        ctx.fillRect(marginLeft - 40, startY, 35, endY - startY);
-        ctx.fillStyle = '#fff';
-        ctx.fillText(label, marginLeft - 35, (startY + endY) / 2);
-    });
 
     // 振幅 Y轴 右边 0 ~ -60 dB
     ctx.beginPath();
@@ -106,6 +112,7 @@ function drawAxes() {
     ctx.stroke();
     ctx.fillText('时间 (最近帧)', canvas.width / 2 - 30, canvas.height - 10);
 }
+
 
 function drawCurves() {
     if (history.length === 0) return;
