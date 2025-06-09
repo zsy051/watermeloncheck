@@ -3,259 +3,188 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>西瓜成熟度检测</title>
+<title>西瓜成熟度检测简易版</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        text-align: center;
-        padding: 20px;
-        background: #f4f4f9;
-        margin: 0;
-        overflow-x: hidden;
-    }
-    h1 {
-        color: #4CAF50;
-    }
-    button {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 18px;
-        margin: 10px 0;
-    }
-    button:hover {
-        background-color: #45a049;
-    }
-    #result {
-        font-size: 18px;
-        margin: 10px 0;
-        color: #333;
-    }
-    canvas {
-        background-color: white;
-        border: 1px solid #ccc;
-        margin-top: 10px;
-        max-width: 100%;
-        height: 30vh;
-    }
-    .input-row {
-        margin: 10px 0;
-        font-size: 16px;
-    }
-    .input-row label {
-        margin-right: 10px;
-    }
-    .input-row input {
-        width: 60px;
-        padding: 3px 5px;
-        font-size: 16px;
-    }
+  body { font-family: Arial; text-align:center; margin:20px; }
+  #result { margin-top:10px; }
+  canvas { border:1px solid #ccc; width:90vw; height: 200px; }
+  .input-row { margin: 10px 0; }
 </style>
 </head>
 <body>
-    <h1>西瓜成熟度检测</h1>
+  <h2>西瓜成熟度检测简易版</h2>
 
-    <button id="toggleButton">开始检测</button>
+  <button id="btnToggle">开始检测</button>
 
-    <div class="input-row">
-        <label for="updateInterval">更新时间(ms)：</label>
-        <input type="number" id="updateInterval" value="100" min="10" max="1000" step="10" />
-        <label for="dbThreshold" style="margin-left:20px;">分贝阈值(dB)：</label>
-        <input type="number" id="dbThreshold" value="-20" min="-50" max="0" step="1" />
-    </div>
+  <div class="input-row">
+    <label>更新时间(ms): <input id="updateInterval" type="number" value="100" min="10" max="1000" step="10"></label>
+    <label style="margin-left:20px;">分贝阈值(dB): <input id="dbThreshold" type="number" value="-20" min="-50" max="0" step="1"></label>
+  </div>
 
-    <div id="result">点击“开始检测”开始</div>
-    <canvas id="frequencyGraph"></canvas>
+  <div id="result">点击开始检测</div>
+  <canvas id="canvas"></canvas>
 
 <script>
-    const toggleButton = document.getElementById('toggleButton');
-    const resultDiv = document.getElementById('result');
-    const canvas = document.getElementById('frequencyGraph');
-    const ctx = canvas.getContext('2d');
+  const btnToggle = document.getElementById('btnToggle');
+  const result = document.getElementById('result');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const updateIntervalInput = document.getElementById('updateInterval');
+  const dbThresholdInput = document.getElementById('dbThreshold');
 
-    const updateIntervalInput = document.getElementById('updateInterval');
-    const dbThresholdInput = document.getElementById('dbThreshold');
+  canvas.width = window.innerWidth * 0.9;
+  canvas.height = 200;
 
-    let audioContext, analyser, stream;
-    let dataArray, timeDomainArray;
-    let bufferLength;
-    let detecting = false;
-    let animationId;
-    let frequencyHistory = [];
-    let startTime;
-    let lastDetectTime = 0;
+  let detecting = false;
+  let frequencyHistory = [];
+  let startTime = 0;
+  let lastDetectTime = 0;
 
-    // 适配canvas大小
-    function resizeCanvas() {
-        canvas.width = window.innerWidth - 40;
-        canvas.height = window.innerHeight / 3;
+  btnToggle.onclick = () => {
+    if (!detecting) {
+      startDetection();
+      btnToggle.textContent = "停止检测";
+    } else {
+      stopDetection();
+      btnToggle.textContent = "开始检测";
     }
-    resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
+  };
 
-    function determineRipeness(freq) {
-        if (freq > 189) return "生瓜";
-        if (freq >= 160 && freq <= 189) return "适熟";
-        if (freq >= 133 && freq < 160) return "熟瓜";
-        return "过熟";
-    }
+  // 模拟音频数据
+  function mockAudioData(t) {
+    // 频率: 100~250Hz区间内正弦波
+    const freq = 175 + 75 * Math.sin(t * 2 * Math.PI / 5);
+    // 分贝: -50 ~ 0 dB区间内变化
+    const db = -25 + 20 * Math.sin(t * 2 * Math.PI / 3);
+    return { freq, db };
+  }
 
-    async function startDetection() {
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
+  function determineRipeness(freq) {
+    if (freq > 189) return "生瓜";
+    if (freq >= 160 && freq <= 189) return "适熟";
+    if (freq >= 133 && freq < 160) return "熟瓜";
+    return "过熟";
+  }
 
-            analyser.fftSize = 2048;
-            bufferLength = analyser.frequencyBinCount;
-            dataArray = new Uint8Array(bufferLength);
-            timeDomainArray = new Uint8Array(analyser.fftSize);
+  function startDetection() {
+    detecting = true;
+    frequencyHistory = [];
+    startTime = Date.now();
+    lastDetectTime = 0;
+    result.textContent = "检测中...";
+    detectLoop();
+    drawLoop();
+  }
 
-            detecting = true;
-            frequencyHistory = [];
-            startTime = Date.now();
-            lastDetectTime = 0;
-            resultDiv.textContent = "正在检测...";
-            animateGraph();
-            detectFrequency();
-        } catch (err) {
-            resultDiv.textContent = "无法访问麦克风：" + err.message;
-        }
-    }
+  function stopDetection() {
+    detecting = false;
+    result.textContent = "检测停止";
+  }
 
-    function stopDetection() {
-        detecting = false;
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-        cancelAnimationFrame(animationId);
-        resultDiv.textContent = "检测已停止";
-    }
+  function detectLoop() {
+    if (!detecting) return;
 
-    function getDecibels() {
-        analyser.getByteTimeDomainData(timeDomainArray);
+    const now = Date.now();
+    const elapsed = (now - startTime) / 1000;
+    const updateInterval = parseInt(updateIntervalInput.value) || 100;
 
-        // 计算音频信号的 RMS（均方根）值
-        let sumSquares = 0;
-        for (let i = 0; i < timeDomainArray.length; i++) {
-            let val = (timeDomainArray[i] - 128) / 128; // 归一化 -1~1
-            sumSquares += val * val;
-        }
-        let rms = Math.sqrt(sumSquares / timeDomainArray.length);
+    if (now - lastDetectTime >= updateInterval) {
+      lastDetectTime = now;
+      // 这里替换为真实音频分析逻辑，先用模拟数据代替
+      const { freq, db } = mockAudioData(elapsed);
 
-        // 转换为分贝，参考值为1
-        // 加一个小值避免log(0)
-        let db = 20 * Math.log10(rms + 1e-8);
-        return db;
-    }
+      const dbThreshold = parseInt(dbThresholdInput.value);
+      const freqToStore = db < dbThreshold ? 0 : freq;
 
-    function detectFrequency() {
-        if (!detecting) return;
+      frequencyHistory.push({ time: elapsed, frequency: freqToStore, db });
 
-        const now = Date.now();
-        const updateInterval = parseInt(updateIntervalInput.value) || 100;
+      // 只保留最近3秒数据
+      frequencyHistory = frequencyHistory.filter(p => p.time >= elapsed - 3);
 
-        if (now - lastDetectTime >= updateInterval) {
-            lastDetectTime = now;
-
-            analyser.getByteFrequencyData(dataArray);
-
-            // 找最大频率峰值索引
-            let maxIndex = 0;
-            for (let i = 1; i < dataArray.length; i++) {
-                if (dataArray[i] > dataArray[maxIndex]) {
-                    maxIndex = i;
-                }
-            }
-            const nyquist = audioContext.sampleRate / 2;
-            const frequency = (maxIndex / bufferLength) * nyquist;
-
-            // 计算分贝
-            const db = getDecibels();
-
-            // 阈值过滤
-            const dbThreshold = parseInt(dbThresholdInput.value);
-            if (db < dbThreshold) {
-                // 低于阈值的声音忽略，频率置0方便曲线显示中断
-                frequencyHistory.push({ time: (now - startTime) / 1000, frequency: 0, db });
-            } else {
-                frequencyHistory.push({ time: (now - startTime) / 1000, frequency, db });
-            }
-
-            // 只保留最近3秒数据
-            const currentTimeSec = (now - startTime) / 1000;
-            frequencyHistory = frequencyHistory.filter(p => p.time >= currentTimeSec - 3);
-
-            if (frequency >= 20 && frequency <= 250) {
-                const ripeness = determineRipeness(frequency);
-                resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz, 成熟度: ${ripeness}，分贝: ${db.toFixed(1)} dB`;
-            } else {
-                resultDiv.textContent = `当前频率: -- Hz，分贝: ${db.toFixed(1)} dB`;
-            }
-        }
-
-        requestAnimationFrame(detectFrequency);
+      if (freqToStore > 0) {
+        result.textContent = `频率: ${freqToStore.toFixed(1)} Hz，成熟度: ${determineRipeness(freqToStore)}，分贝: ${db.toFixed(1)} dB`;
+      } else {
+        result.textContent = `频率低于阈值，分贝: ${db.toFixed(1)} dB`;
+      }
     }
 
-    function animateGraph() {
-        if (!detecting) return;
+    requestAnimationFrame(detectLoop);
+  }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function drawLoop() {
+    if (!detecting) return;
 
-        const marginLeft = 50;
-        const marginBottom = 50;
-        const plotWidth = canvas.width - marginLeft - 60; // 右边留60给db轴
-        const plotHeight = canvas.height - marginBottom - 10;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 画坐标轴
-        ctx.strokeStyle = "#888";
-        ctx.beginPath();
-        ctx.moveTo(marginLeft, 10);
-        ctx.lineTo(marginLeft, canvas.height - marginBottom);
-        ctx.lineTo(canvas.width - 10, canvas.height - marginBottom);
-        ctx.stroke();
+    const marginLeft = 40;
+    const marginBottom = 30;
+    const plotWidth = canvas.width - marginLeft - 50;
+    const plotHeight = canvas.height - marginBottom - 20;
 
-        // 频率Y轴 100 ~ 250 Hz
-        const freqYLabels = [
-            { value: 250, label: "250 Hz" },
-            { value: 189, label: "生瓜" },
-            { value: 160, label: "适熟" },
-            { value: 133, label: "熟瓜" },
-            { value: 100, label: "100 Hz" },
-        ];
-        ctx.fillStyle = "#000";
-        ctx.font = "14px Arial";
-        freqYLabels.forEach(label => {
-            const y = canvas.height - marginBottom - ((label.value - 100) / (250 - 100)) * plotHeight;
-            ctx.fillText(label.label, 5, y + 5);
-            ctx.beginPath();
-            ctx.moveTo(marginLeft - 5, y);
-            ctx.lineTo(marginLeft + 5, y);
-            ctx.stroke();
-        });
+    // 坐标轴
+    ctx.strokeStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(marginLeft, 10);
+    ctx.lineTo(marginLeft, canvas.height - marginBottom);
+    ctx.lineTo(canvas.width - 10, canvas.height - marginBottom);
+    ctx.stroke();
 
-        // 分贝Y轴 0 到 -50 dB 显示在右边
-        const dbYLabels = [
-            { value: 0, label: "0 dB" },
-            { value: -10, label: "-10 dB" },
-            { value: -20, label: "-20 dB" },
-            { value: -30, label: "-30 dB" },
-            { value: -40, label: "-40 dB" },
-            { value: -50, label: "-50 dB" },
-        ];
-        dbYLabels.forEach(label => {
-            const y = canvas.height - marginBottom - ((0 - label.value) / 50) * plotHeight;
-            ctx.fillText(label.label, canvas.width - 50, y + 5);
-            ctx.beginPath();
-            ctx.moveTo(canvas.width - 60, y);
-            ctx.lineTo(canvas.width - 40, y);
-            ctx.stroke();
-        });
+    // Y轴频率(左)
+    ctx.fillStyle = 'black';
+    ctx.font = '12px Arial';
+    const freqMin = 100, freqMax = 250;
+    for (let f = freqMin; f <= freqMax; f += 30) {
+      const y = canvas.height - marginBottom - ((f - freqMin) / (freqMax - freqMin)) * plotHeight;
+      ctx.fillText(f + 'Hz', 5, y + 4);
+      ctx.beginPath();
+      ctx.moveTo(marginLeft - 5, y);
+      ctx.lineTo(marginLeft + 5, y);
+      ctx.stroke();
+    }
 
-        // 时间X轴刻度
-        const xEndTime = frequencyHistory.length > 0 ? frequencyHistory[frequencyHistory
+    // Y轴分贝(右)
+    const dbMin = -50, dbMax = 0;
+    for (let d = dbMin; d <= dbMax; d += 10) {
+      const y = canvas.height - marginBottom - ((d - dbMin) / (dbMax - dbMin)) * plotHeight;
+      ctx.fillText(d + 'dB', canvas.width - 45, y + 4);
+      ctx.beginPath();
+      ctx.moveTo(canvas.width - 55, y);
+      ctx.lineTo(canvas.width - 35, y);
+      ctx.stroke();
+    }
+
+    // X轴 时间 最近3秒
+    const now = frequencyHistory.length ? frequencyHistory[frequencyHistory.length -1].time : 0;
+    ctx.fillText('时间(s)', canvas.width/2 - 15, canvas.height - 10);
+
+    // 画频率线 (绿色)
+    ctx.strokeStyle = 'green';
+    ctx.beginPath();
+    frequencyHistory.forEach((p, i) => {
+      const x = marginLeft + ((p.time - (now - 3)) / 3) * plotWidth;
+      const y = canvas.height - marginBottom - ((p.frequency - freqMin) / (freqMax - freqMin)) * plotHeight;
+      if (p.frequency === 0) {
+        if (i > 0) ctx.moveTo(x, y);
+      } else {
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    });
+    ctx.stroke();
+
+    // 画分贝线 (蓝色)
+    ctx.strokeStyle = 'blue';
+    ctx.beginPath();
+    frequencyHistory.forEach((p, i) => {
+      const x = marginLeft + ((p.time - (now - 3)) / 3) * plotWidth;
+      const y = canvas.height - marginBottom - ((p.db - dbMin) / (dbMax - dbMin)) * plotHeight;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    requestAnimationFrame(drawLoop);
+  }
+</script>
+</body>
+</html>
