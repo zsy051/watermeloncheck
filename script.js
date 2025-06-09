@@ -1,94 +1,156 @@
-let lastUpdateTime = 0; // 上次更新的时间戳
-const updateInterval = 16; // 每次更新的最小间隔（约 60fps）
+const toggleButton = document.getElementById('toggleButton');
+const canvas = document.getElementById('frequencyGraph');
+const ctx = canvas.getContext('2d');
+const displayCountInput = document.getElementById('displayCount');
+const noiseFilterInput = document.getElementById('noiseFilter');
 
-function detectFrequency() {
-    if (!detecting) return;
+canvas.width = window.innerWidth * 0.8;
+canvas.height = 400;
 
-    const currentTime = Date.now();
-    const timeElapsed = (currentTime - startTime) / 1000; // 秒
+let audioContext, analyser, dataArray, amplitudeArray;
+let frequencyHistory = [];
+let amplitudeHistory = [];
+let detecting = false;
 
-    analyser.getByteFrequencyData(dataArray);
+function startDetection() {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
 
-    let maxIndex = 0;
-    for (let i = 1; i < dataArray.length; i++) {
-        if (dataArray[i] > dataArray[maxIndex]) {
-            maxIndex = i;
-        }
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        amplitudeArray = new Float32Array(analyser.frequencyBinCount);
+
+        source.connect(analyser);
+        animateGraph();
+    }).catch(err => {
+        console.error('无法访问麦克风:', err);
+    });
+}
+
+function stopDetection() {
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
     }
+    detecting = false;
+}
 
-    const nyquist = audioContext.sampleRate / 2;
-    const frequency = (maxIndex / bufferLength) * nyquist;
-
-    if (frequency >= 20 && frequency <= 250 && currentTime - lastUpdateTime > updateInterval) {
-        frequencyHistory.push({ time: timeElapsed, frequency });
-        lastUpdateTime = currentTime;
-
-        // 保持最近 3 秒数据
-        frequencyHistory = frequencyHistory.filter((point) => point.time >= timeElapsed - 3);
-
-        const ripeness = determineRipeness(frequency);
-        resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz, 成熟度: ${ripeness}`;
+function toggleDetection() {
+    if (detecting) {
+        toggleButton.textContent = '开始检测';
+        stopDetection();
+    } else {
+        toggleButton.textContent = '停止检测';
+        detecting = true;
+        startDetection();
     }
-
-    requestAnimationFrame(detectFrequency);
 }
 
 function animateGraph() {
     if (!detecting) return;
 
+    analyser.getByteFrequencyData(dataArray);
+    analyser.getFloatFrequencyData(amplitudeArray);
+
+    const noiseFilter = parseInt(noiseFilterInput.value, 10);
+    const displayCount = parseInt(displayCountInput.value, 10);
+
+    const filteredFrequencies = [];
+    const filteredAmplitudes = [];
+    for (let i = 0; i < dataArray.length; i++) {
+        const freq = (i / dataArray.length) * (audioContext.sampleRate / 2);
+        if (freq >= noiseFilter) {
+            filteredFrequencies.push(freq);
+            filteredAmplitudes.push(amplitudeArray[i]);
+        }
+    }
+
+    frequencyHistory.push([...filteredFrequencies]);
+    amplitudeHistory.push([...filteredAmplitudes]);
+
+    // Maintain history size
+    if (frequencyHistory.length > displayCount) {
+        frequencyHistory.shift();
+    }
+    if (amplitudeHistory.length > displayCount) {
+        amplitudeHistory.shift();
+    }
+
+    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 绘制坐标轴
-    ctx.strokeStyle = "#888";
+    // Draw axes
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(50, 10);
     ctx.lineTo(50, canvas.height - 50);
     ctx.lineTo(canvas.width - 10, canvas.height - 50);
     ctx.stroke();
 
-    // 绘制频率刻度
-    const yLabels = [
-        { value: 250, label: "250 Hz" },
-        { value: 189, label: "生瓜" },
-        { value: 160, label: "适熟" },
-        { value: 133, label: "熟瓜" },
-        { value: 20, label: "20 Hz" },
-    ];
-
-    yLabels.forEach((label) => {
-        const y = canvas.height - 50 - (label.value / 250) * (canvas.height - 60);
-        ctx.fillText(label.label, 5, y + 3);
+    // Frequency labels (left Y-axis)
+    const freqRange = [100, 250];
+    const freqHeight = canvas.height - 60;
+    freqRange.forEach(freq => {
+        const y = canvas.height - 50 - ((freq - 100) / 150) * freqHeight;
+        ctx.fillStyle = '#000';
+        ctx.fillText(`${freq} Hz`, 10, y);
         ctx.beginPath();
         ctx.moveTo(45, y);
         ctx.lineTo(55, y);
         ctx.stroke();
     });
 
-    // 绘制时间刻度
-    const xEndTime = frequencyHistory.length > 0 ? frequencyHistory[frequencyHistory.length - 1].time : 0;
-    for (let i = Math.floor(xEndTime - 3); i <= xEndTime; i++) {
-        const x = 50 + ((i - (xEndTime - 3)) / 3) * (canvas.width - 60);
-        ctx.fillText(`${i}s`, x, canvas.height - 30);
+    // Amplitude labels (right Y-axis)
+    const ampRange = [0, -60];
+    const ampHeight = canvas.height - 60;
+    ampRange.forEach(amp => {
+        const y = canvas.height - 50 - ((amp - (-60)) / 60) * ampHeight;
+        ctx.fillStyle = '#f00';
+        ctx.fillText(`${amp} dB`, canvas.width - 40, y);
         ctx.beginPath();
-        ctx.moveTo(x, canvas.height - 55);
-        ctx.lineTo(x, canvas.height - 45);
+        ctx.moveTo(canvas.width - 45, y);
+        ctx.lineTo(canvas.width - 55, y);
         ctx.stroke();
-    }
+    });
 
-    // 绘制频率曲线
-    ctx.strokeStyle = "#4CAF50";
+    // Draw frequency curve
+    ctx.strokeStyle = '#4CAF50';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    frequencyHistory.forEach((point, index) => {
-        const x = 50 + ((point.time - (xEndTime - 3)) / 3) * (canvas.width - 60);
-        const y = canvas.height - 50 - (point.frequency / 250) * (canvas.height - 60);
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
+    frequencyHistory.forEach((frequencies, i) => {
+        frequencies.forEach((freq, j) => {
+            const x = 50 + ((j / frequencies.length) * (canvas.width - 60));
+            const y = canvas.height - 50 - ((freq - 100) / 150) * freqHeight;
+            if (i === 0 && j === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
     });
     ctx.stroke();
 
-    animationId = requestAnimationFrame(animateGraph);
+    // Draw amplitude curve
+    ctx.strokeStyle = '#FF0000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    amplitudeHistory.forEach((amplitudes, i) => {
+        amplitudes.forEach((amp, j) => {
+            const x = 50 + ((j / amplitudes.length) * (canvas.width - 60));
+            const y = canvas.height - 50 - ((amp - (-60)) / 60) * ampHeight;
+            if (i === 0 && j === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+    });
+    ctx.stroke();
+
+    requestAnimationFrame(animateGraph);
 }
+
+toggleButton.addEventListener('click', toggleDetection);
