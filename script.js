@@ -131,7 +131,7 @@ function animateGraph() {
     // 左侧y轴标签（频率）
     ctx.fillStyle = '#4CAF50';
     ctx.font = '12px Arial';
-    for (let f = 100; f <= 250; f += 30) {
+    for (let f = 100; f <= 450; f += 30) {
         const y = marginTop + height - ((f - 100) / 150) * height;
         ctx.fillText(`${f}Hz`, 5, y + 4);
         ctx.beginPath();
