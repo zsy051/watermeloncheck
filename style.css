@@ -19,13 +19,14 @@ button {
 button:hover {
     background-color: #45a049;
 }
+canvas {
+    margin: 20px auto;
+    display: block;
+    border: 1px solid #ddd;
+    background-color: #fff;
+}
 #result {
     margin-top: 20px;
     font-size: 18px;
     color: #333;
-}
-canvas {
-    margin-top: 20px;
-    border: 1px solid #ccc;
-    background-color: white;
 }
