@@ -44,7 +44,8 @@
   #result {
     margin-top: 15px;
     font-size: 16px;
-    min-height: 24px;
+    min-height: 30px;
+    white-space: pre-wrap;
   }
   canvas {
     margin-top: 15px;
@@ -64,7 +65,7 @@
   </label>
   <label>
     分贝阈值 (dB):
-    <input type="number" id="decibelThresholdInput" min="-80" max="0" step="1" value="-40" />
+    <input type="number" id="decibelThresholdInput" min="-80" max="0" step="1" value="-60" />
   </label>
 </div>
 
@@ -162,10 +163,12 @@
     const amplitudeRatio = amplitude / 255;
     const decibel = amplitudeRatio > 0 ? 20 * Math.log10(amplitudeRatio) : -Infinity;
 
+    // 每隔 updateInterval 秒更新一次数据
     if (now - lastUpdateTime > updateInterval * 1000) {
       lastUpdateTime = now;
 
       if (decibel >= decibelThreshold) {
+        // 找最大频率索引
         let maxIndex = 0;
         for (let i = 1; i < dataArray.length; i++) {
           if (dataArray[i] > dataArray[maxIndex]) maxIndex = i;
@@ -177,11 +180,16 @@
           const timeElapsed = (now - startTime) / 1000;
           frequencyHistory.push({ time: timeElapsed, frequency, decibel });
 
+          // 保留最近3秒数据
           frequencyHistory = frequencyHistory.filter(p => p.time >= timeElapsed - 3);
 
           const ripeness = determineRipeness(frequency);
-          resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz，成熟度: ${ripeness}，分贝: ${decibel.toFixed(1)} dB`;
+          resultDiv.textContent = `当前频率: ${frequency.toFixed(2)} Hz\n成熟度: ${ripeness}\n分贝: ${decibel.toFixed(1)} dB\n采样点数: ${frequencyHistory.length}`;
+        } else {
+          resultDiv.textContent = `频率超出范围: ${frequency.toFixed(2)} Hz\n分贝: ${decibel.toFixed(1)} dB\n采样点数: ${frequencyHistory.length}`;
         }
+      } else {
+        resultDiv.textContent = `环境噪音过低: ${decibel.toFixed(1)} dB < 阈值 ${decibelThreshold} dB\n采样点数: ${frequencyHistory.length}`;
       }
     }
     requestAnimationFrame(detectFrequency);
@@ -202,7 +210,7 @@
     ctx.beginPath();
     ctx.moveTo(50, 10);
     ctx.lineTo(50, canvas.height - 50);
-    ctx.lineTo(canvas.width - 50, canvas.height - 50);
+    ctx.lineTo(canvas.width - 60, canvas.height - 50);
     ctx.stroke();
 
     // 左y轴频率刻度及标签
@@ -224,8 +232,8 @@
 
     // 右y轴分贝轴线
     ctx.beginPath();
-    ctx.moveTo(canvas.width - 50, 10);
-    ctx.lineTo(canvas.width - 50, canvas.height - 50);
+    ctx.moveTo(canvas.width - 60, 10);
+    ctx.lineTo(canvas.width - 60, canvas.height - 50);
     ctx.stroke();
 
     // 右y轴分贝刻度
@@ -235,10 +243,10 @@
     const dBStep = 20;
     for (let db = dBMin; db <= dBMax; db += dBStep) {
       const y = canvas.height - 50 - ((db - dBMin) / (dBMax - dBMin)) * (canvas.height - 60);
-      ctx.fillText(`${db} dB`, canvas.width - 55, y + 4);
+      ctx.fillText(`${db} dB`, canvas.width - 65, y + 4);
       ctx.beginPath();
-      ctx.moveTo(canvas.width - 55, y);
-      ctx.lineTo(canvas.width - 45, y);
+      ctx.moveTo(canvas.width - 65, y);
+      ctx.lineTo(canvas.width - 55, y);
       ctx.stroke();
     }
     ctx.textAlign = "center";
@@ -246,7 +254,7 @@
     // x轴时间刻度（过去3秒）
     const nowTime = frequencyHistory.length ? frequencyHistory[frequencyHistory.length - 1].time : 0;
     for (let i = Math.floor(nowTime - 3); i <= nowTime; i++) {
-      const x = 50 + ((i - (nowTime - 3)) / 3) * (canvas.width - 100);
+      const x = 50 + ((i - (nowTime - 3)) / 3) * (canvas.width - 110);
       ctx.fillText(`${i}s`, x, canvas.height - 30);
       ctx.beginPath();
       ctx.moveTo(x, canvas.height - 55);
@@ -259,7 +267,7 @@
     ctx.lineWidth = 2;
     ctx.beginPath();
     frequencyHistory.forEach((p, i) => {
-      const x = 50 + ((p.time - (nowTime - 3)) / 3) * (canvas.width - 100);
+      const x = 50 + ((p.time - (nowTime - 3)) / 3) * (canvas.width - 110);
       const y = canvas.height - 50 - (p.frequency / 250) * (canvas.height - 60);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
@@ -271,27 +279,6 @@
     ctx.lineWidth = 2;
     ctx.beginPath();
     frequencyHistory.forEach((p, i) => {
-      const x = 50 + ((p.time - (nowTime - 3)) / 3) * (canvas.width - 100);
-      // 分贝映射到右边y轴范围（-80到0映射到画布）
+      const x = 50 + ((p.time - (nowTime - 3)) / 3) * (canvas.width - 110);
       const y = canvas.height - 50 - ((p.decibel - dBMin) / (dBMax - dBMin)) * (canvas.height - 60);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    animationId = requestAnimationFrame(animateGraph);
-  }
-
-  toggleButton.addEventListener('click', () => {
-    if (!detecting) {
-      startDetection();
-      toggleButton.textContent = "停止检测";
-    } else {
-      stopDetection();
-      toggleButton.textContent = "开始检测";
-    }
-  });
-</script>
-
-</body>
-</html>
+      if (i === 0) ctx.moveTo(x
