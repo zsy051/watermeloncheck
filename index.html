@@ -1,16 +1,89 @@
-<button id="toggleButton">开始检测</button>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>西瓜成熟度检测</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        h1 {
+            color: #4CAF50;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+        }
+        #frequencyGraph {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+            width: 100%;
+            max-width: 900px;
+            height: 200px;
+            background-color: #fff;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .slider-container {
+            margin-top: 15px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left;
+            font-size: 16px;
+        }
+        .slider-label {
+            display: inline-block;
+            width: 150px;
+        }
+        input[type=range] {
+            width: 200px;
+            vertical-align: middle;
+        }
+        span.value-display {
+            margin-left: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>西瓜成熟度检测</h1>
+    <p>点击“开始检测”，然后轻敲西瓜，系统会分析声音频率。</p>
 
-<div style="margin-top: 15px;">
-  <label for="updateIntervalInput">更新时间间隔 (秒): </label>
-  <input type="range" id="updateIntervalInput" min="0.005" max="0.1" step="0.005" value="0.01" />
-  <span id="updateIntervalValue">0.01</span>
-</div>
+    <button id="toggleButton">开始检测</button>
 
-<div style="margin-top: 15px;">
-  <label for="decibelThresholdInput">分贝阈值 (dB): </label>
-  <input type="range" id="decibelThresholdInput" min="20" max="80" step="1" value="40" />
-  <span id="decibelThresholdValue">40</span>
-</div>
+    <div class="slider-container">
+        <label for="updateIntervalInput" class="slider-label">更新时间间隔 (秒):</label>
+        <input type="range" id="updateIntervalInput" min="0.005" max="0.1" step="0.005" value="0.01" />
+        <span id="updateIntervalValue" class="value-display">0.01</span>
+    </div>
 
-<div id="result"></div>
-<canvas id="frequencyGraph"></canvas>
+    <div class="slider-container">
+        <label for="decibelThresholdInput" class="slider-label">分贝阈值 (dB):</label>
+        <input type="range" id="decibelThresholdInput" min="20" max="80" step="1" value="40" />
+        <span id="decibelThresholdValue" class="value-display">40</span>
+    </div>
+
+    <div id="result"></div>
+    <canvas id="frequencyGraph"></canvas>
+
+    <script src="script.js"></script>
+</body>
+</html>
